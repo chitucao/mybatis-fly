@@ -15,22 +15,18 @@
  */
 package org.apache.ibatis.executor;
 
-import java.sql.SQLException;
-import java.util.List;
-
 import org.apache.ibatis.cache.Cache;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.cache.TransactionalCacheManager;
 import org.apache.ibatis.cursor.Cursor;
-import org.apache.ibatis.mapping.BoundSql;
-import org.apache.ibatis.mapping.MappedStatement;
-import org.apache.ibatis.mapping.ParameterMapping;
-import org.apache.ibatis.mapping.ParameterMode;
-import org.apache.ibatis.mapping.StatementType;
+import org.apache.ibatis.mapping.*;
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.transaction.Transaction;
+
+import java.sql.SQLException;
+import java.util.List;
 
 /**
  * @author Clinton Begin
@@ -76,6 +72,16 @@ public class CachingExecutor implements Executor {
     return delegate.update(ms, parameterObject);
   }
 
+  /**
+   * 问题：二级缓存的CacheKey 是怎么构成的呢？或者说，什么样的查询才能确定是同一个查询呢？
+   * @param ms
+   * @param parameterObject
+   * @param rowBounds
+   * @param resultHandler
+   * @param <E>
+   * @return
+   * @throws SQLException
+   */
   @Override
   public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
     BoundSql boundSql = ms.getBoundSql(parameterObject);
@@ -89,18 +95,37 @@ public class CachingExecutor implements Executor {
     return delegate.queryCursor(ms, parameter, rowBounds);
   }
 
+  /**
+   * 1.处理二级缓存
+   * @param ms
+   * @param parameterObject
+   * @param rowBounds
+   * @param resultHandler
+   * @param key
+   * @param boundSql
+   * @param <E>
+   * @return
+   * @throws SQLException
+   */
   @Override
   public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql)
       throws SQLException {
+    // 首先从ms中取出cache 对象，判断cache 对象是否为空，如果为空，则没有查询二级缓存、写入二级缓存的流程。
+    // Cache 对象是什么时候创建的呢？用来解析Mapper.xml的XMLMapperBuilder类，cacheElement(）方法：
+    // 只有M apper.xm l中的<cache>标签不为空才解析。
     Cache cache = ms.getCache();
     if (cache != null) {
       flushCacheIfRequired(ms);
       if (ms.isUseCache() && resultHandler == null) {
         ensureNoOutParams(ms, boundSql);
+        // 获取二级缓存
+        // 从map 中拿出TransactionaICache 对象，这个对象也是对PerpetualCache 经过层层装饰的缓存对象
+        // 这个是— 个会递归调用的方法，直到到达PerpetualCache 拿到value。
         @SuppressWarnings("unchecked")
         List<E> list = (List<E>) tcm.getObject(cache, key);
         if (list == null) {
           list = delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+          // 写入二级缓存   此时缓存还没有真正地写入。 只有事务提交的时候缓存才真正写入(close 或者commit 最后分析）。
           tcm.putObject(cache, key, list); // issue #578 and #116
         }
         return list;

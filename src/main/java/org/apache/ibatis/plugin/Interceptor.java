@@ -24,6 +24,8 @@ public interface Interceptor {
 
   Object intercept(Invocation invocation) throws Throwable;
 
+  // next
+  // Java8默认方法的应用，可以覆盖
   default Object plugin(Object target) {
     return Plugin.wrap(target, this);
   }

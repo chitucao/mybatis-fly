@@ -15,12 +15,12 @@
  */
 package org.apache.ibatis.cache;
 
+import org.apache.ibatis.reflection.ArrayUtil;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
-
-import org.apache.ibatis.reflection.ArrayUtil;
 
 /**
  * @author Clinton Begin
@@ -48,6 +48,8 @@ public class CacheKey implements Cloneable, Serializable {
   private long checksum;
   private int count;
   // 8/21/2017 - Sonarlint flags this as needing to be marked transient.  While true if content is not serializable, this is not always true and thus should not be marked transient.
+  // 这个集合存放了保证key唯一性的要素
+  // 并不是一上来就通过这6个要素比较这两个key是否相等，而是通过重写的hashcode先进行判断，然后equals
   private List<Object> updateList;
 
   public CacheKey() {
@@ -73,6 +75,12 @@ public class CacheKey implements Cloneable, Serializable {
     checksum += baseHashCode;
     baseHashCode *= count;
 
+    /**
+     * Object中的hashCode(）是— 个本地方法，通过随机数算法生成(O penJD K8 , 默认可以通过－XX:hashCode 修改）。
+     * CacheKey 中的hashCode(）方法进行了重写，返回自己生成的hashCode。
+     * 为什么要用37 作为乘法因子呢？跟String 中的31 类似。
+     * CacheKey 中的equals也进行了重写，比较CacheKey 是否相等。
+     */
     hashcode = multiplier * hashcode + baseHashCode;
 
     updateList.add(object);
@@ -84,6 +92,11 @@ public class CacheKey implements Cloneable, Serializable {
     }
   }
 
+  /**
+   * 如果哈希值（乘法哈希）、校验值（加法哈希）、要素个数任何— 个不相等，都不是同一个查询，最后才循环比较要素，防止哈希碰撞。
+   * @param object
+   * @return
+   */
   @Override
   public boolean equals(Object object) {
     if (this == object) {

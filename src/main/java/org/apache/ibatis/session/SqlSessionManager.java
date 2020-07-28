@@ -15,6 +15,10 @@
  */
 package org.apache.ibatis.session;
 
+import org.apache.ibatis.cursor.Cursor;
+import org.apache.ibatis.executor.BatchResult;
+import org.apache.ibatis.reflection.ExceptionUtil;
+
 import java.io.InputStream;
 import java.io.Reader;
 import java.lang.reflect.InvocationHandler;
@@ -25,12 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.ibatis.cursor.Cursor;
-import org.apache.ibatis.executor.BatchResult;
-import org.apache.ibatis.reflection.ExceptionUtil;
-
 /**
  * @author Larry Meadors
+ * MyBatis还自带的—个线程安全的SqlSession实现,和SqlSessionTemplate实现方式—样，
+ * 如果不集成到Spring要保证线程安全，就用SqlSessionManager。
  */
 public class SqlSessionManager implements SqlSessionFactory, SqlSession {
 

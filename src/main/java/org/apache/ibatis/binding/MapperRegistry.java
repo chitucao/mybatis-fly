@@ -15,16 +15,12 @@
  */
 package org.apache.ibatis.binding;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.ibatis.builder.annotation.MapperAnnotationBuilder;
 import org.apache.ibatis.io.ResolverUtil;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
+
+import java.util.*;
 
 /**
  * @author Clinton Begin
@@ -40,6 +36,14 @@ public class MapperRegistry {
     this.config = config;
   }
 
+  /**
+   * 在解析mapper 标签和Mapper.xml 的时候已经把接口类型和类型对应的MapperProxy Factory 放到了— 个Map 中。
+   * 获取Mapper 代理对象，实际上是从Map 中获取对应的工厂类后，调用工厂类创建对象。
+   * @param type
+   * @param sqlSession
+   * @param <T>
+   * @return
+   */
   @SuppressWarnings("unchecked")
   public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
     final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
@@ -47,6 +51,7 @@ public class MapperRegistry {
       throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
     }
     try {
+      // next
       return mapperProxyFactory.newInstance(sqlSession);
     } catch (Exception e) {
       throw new BindingException("Error getting mapper instance. Cause: " + e, e);
@@ -57,6 +62,14 @@ public class MapperRegistry {
     return knownMappers.containsKey(type);
   }
 
+  /**
+   * 1.把接口类型注册到MapperRegistry中，实际上是为接口创建了一个对应的MapperProxyFactory
+   *    MapperProxyFactory（用于为这个type提供工厂类，创建对应的MapperProxy）
+   * 2.解析接口类和其方法上的注解例如@CacheNameSpace，@select，创建了一个MapperAnnotationBuilder来解析注解
+   * #knownMappers.put(type, new MapperProxyFactory<>(type));
+   * @param type
+   * @param <T>
+   */
   public <T> void addMapper(Class<T> type) {
     if (type.isInterface()) {
       if (hasMapper(type)) {
@@ -64,11 +77,14 @@ public class MapperRegistry {
       }
       boolean loadCompleted = false;
       try {
+        // 1.解析接口类型，创建接口代理
         knownMappers.put(type, new MapperProxyFactory<>(type));
         // It's important that the type is added before the parser is run
         // otherwise the binding may automatically be attempted by the
         // mapper parser. If the type is already known, it won't try.
+        // 接口注解处理类
         MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
+        // 解析接口，包括各种注解，最后也会调用addMappedStatement方法将MapperStatement加入到MapperRegistry中
         parser.parse();
         loadCompleted = true;
       } finally {

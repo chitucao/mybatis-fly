@@ -15,10 +15,10 @@
  */
 package org.apache.ibatis.cache;
 
+import org.apache.ibatis.cache.decorators.TransactionalCache;
+
 import java.util.HashMap;
 import java.util.Map;
-
-import org.apache.ibatis.cache.decorators.TransactionalCache;
 
 /**
  * @author Clinton Begin
@@ -36,6 +36,7 @@ public class TransactionalCacheManager {
   }
 
   public void putObject(Cache cache, CacheKey key, Object value) {
+    // 从map 中拿出TransactionaICache 对象，把value 添加到待提交的Map。
     getTransactionalCache(cache).putObject(key, value);
   }
 

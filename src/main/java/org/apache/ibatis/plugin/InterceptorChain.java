@@ -26,8 +26,12 @@ public class InterceptorChain {
 
   private final List<Interceptor> interceptors = new ArrayList<>();
 
+  // TOP6 插件代理的入口
   public Object pluginAll(Object target) {
+
+    // 因为这里是for 循环代理，所以某个核心对象有多个插件，会返回被代理多次的代理对象。
     for (Interceptor interceptor : interceptors) {
+      // plugin是Interceptor接口的方法之一，需要我们自己实现，返回一个代理对象
       target = interceptor.plugin(target);
     }
     return target;

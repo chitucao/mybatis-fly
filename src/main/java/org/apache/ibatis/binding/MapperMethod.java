@@ -15,15 +15,6 @@
  */
 package org.apache.ibatis.binding;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import org.apache.ibatis.annotations.Flush;
 import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.cursor.Cursor;
@@ -38,11 +29,23 @@ import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.session.SqlSession;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * @author Clinton Begin
  * @author Eduardo Macarron
  * @author Lasse Voss
  * @author Kazuki Shimizu
+ * 两个重要的内部类属性SqlCommand、MethodSignature
+ *  SqlCommand：封装了statementid(name)，例如com.gupaoedu.mapper.BlogMapper.selectBlogByld和SQL类型(SqlCommandType)
+ *  MethodSignature：封装返回值类型（returnXXX）
  */
 public class MapperMethod {
 
@@ -54,6 +57,15 @@ public class MapperMethod {
     this.method = new MethodSignature(config, mapperInterface, method);
   }
 
+  /**
+   * next
+   * 根据不同的type (INSERT、UPDATE、DELETE、SELECT) 和返回类型作不同处理
+   *  1.调用convertArgsToSqlCommandParam(）将方法参数转换为SQL的参数。
+   *  2.调用sqlSession的insert(、）update(）、delete(）、selectOne (）方法
+   * @param sqlSession
+   * @param args
+   * @return
+   */
   public Object execute(SqlSession sqlSession, Object[] args) {
     Object result;
     switch (command.getType()) {
@@ -84,6 +96,8 @@ public class MapperMethod {
           result = executeForCursor(sqlSession, args);
         } else {
           Object param = method.convertArgsToSqlCommandParam(args);
+          // TOP4 next example
+          // 我们以查询为例，会走到selectOne(）方法。
           result = sqlSession.selectOne(command.getName(), param);
           if (method.returnsOptional()
               && (result == null || !method.getReturnType().equals(result.getClass()))) {

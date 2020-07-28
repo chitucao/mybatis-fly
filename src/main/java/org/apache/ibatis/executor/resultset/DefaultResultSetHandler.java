@@ -15,19 +15,6 @@
  */
 package org.apache.ibatis.executor.resultset;
 
-import java.lang.reflect.Constructor;
-import java.sql.CallableStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.ibatis.annotations.AutomapConstructor;
 import org.apache.ibatis.binding.MapperMethod.ParamMap;
 import org.apache.ibatis.cache.CacheKey;
@@ -42,25 +29,22 @@ import org.apache.ibatis.executor.parameter.ParameterHandler;
 import org.apache.ibatis.executor.result.DefaultResultContext;
 import org.apache.ibatis.executor.result.DefaultResultHandler;
 import org.apache.ibatis.executor.result.ResultMapException;
-import org.apache.ibatis.mapping.BoundSql;
-import org.apache.ibatis.mapping.Discriminator;
-import org.apache.ibatis.mapping.MappedStatement;
-import org.apache.ibatis.mapping.ParameterMapping;
-import org.apache.ibatis.mapping.ParameterMode;
-import org.apache.ibatis.mapping.ResultMap;
-import org.apache.ibatis.mapping.ResultMapping;
+import org.apache.ibatis.mapping.*;
 import org.apache.ibatis.reflection.MetaClass;
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.ReflectorFactory;
 import org.apache.ibatis.reflection.factory.ObjectFactory;
-import org.apache.ibatis.session.AutoMappingBehavior;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.ResultContext;
-import org.apache.ibatis.session.ResultHandler;
-import org.apache.ibatis.session.RowBounds;
+import org.apache.ibatis.session.*;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.TypeHandler;
 import org.apache.ibatis.type.TypeHandlerRegistry;
+
+import java.lang.reflect.Constructor;
+import java.sql.CallableStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.*;
 
 /**
  * @author Clinton Begin
@@ -174,9 +158,13 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   }
 
-  //
-  // HANDLE RESULT SETS
-  //
+
+  /**
+   * HANDLE RESULT SETS
+   * @param stmt
+   * @return
+   * @throws SQLException
+   */
   @Override
   public List<Object> handleResultSets(Statement stmt) throws SQLException {
     ErrorContext.instance().activity("handling results").object(mappedStatement.getId());
@@ -184,6 +172,9 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     final List<Object> multipleResults = new ArrayList<>();
 
     int resultSetCount = 0;
+
+    // 首先我们会先拿到—第个结果集，如果没有配置—个查询返回多个结果集的情况，
+    // 一般只有一个结果集。如果下面的这个while 循环我们也不用，就是执行一次。
     ResultSetWrapper rsw = getFirstResultSet(stmt);
 
     List<ResultMap> resultMaps = mappedStatement.getResultMaps();
@@ -204,6 +195,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
         if (parentMapping != null) {
           String nestedResultMapId = parentMapping.getNestedResultMapId();
           ResultMap resultMap = configuration.getResultMap(nestedResultMapId);
+          // 处理结果集
           handleResultSet(rsw, resultMap, null, parentMapping);
         }
         rsw = getNextResultSet(stmt);

@@ -15,10 +15,6 @@
  */
 package org.apache.ibatis.executor.statement;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
-
 import org.apache.ibatis.executor.ErrorContext;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.executor.ExecutorException;
@@ -33,15 +29,26 @@ import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.type.TypeHandlerRegistry;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+
 /**
  * @author Clinton Begin
+ *
+ * StatementHandler、ParameterHandler、ResultSetHandler、Executor是插件可以拦截的四大对象。
+ *
+ *
  */
 public abstract class BaseStatementHandler implements StatementHandler {
 
   protected final Configuration configuration;
   protected final ObjectFactory objectFactory;
   protected final TypeHandlerRegistry typeHandlerRegistry;
+
+  // 用来处理结果集  只有一个实现类 DefaultResultSetHandler
   protected final ResultSetHandler resultSetHandler;
+  // 用来处理参数
   protected final ParameterHandler parameterHandler;
 
   protected final Executor executor;
@@ -66,6 +73,7 @@ public abstract class BaseStatementHandler implements StatementHandler {
 
     this.boundSql = boundSql;
 
+    // 这两个参数在Executor的doQuery创建newStatementHandler时创建
     this.parameterHandler = configuration.newParameterHandler(mappedStatement, parameterObject, boundSql);
     this.resultSetHandler = configuration.newResultSetHandler(executor, mappedStatement, rowBounds, parameterHandler, resultHandler, boundSql);
   }

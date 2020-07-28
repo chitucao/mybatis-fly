@@ -17,6 +17,8 @@ package org.apache.ibatis.session;
 
 /**
  * @author Eduardo Macarron
+ * 设置为SESSION表示启用一级缓存
+ * 设置为STATEMENT表示关闭一级缓存
  */
 public enum LocalCacheScope {
   SESSION,STATEMENT

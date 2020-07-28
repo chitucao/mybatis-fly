@@ -15,38 +15,21 @@
  */
 package org.apache.ibatis.builder.xml;
 
-import java.io.InputStream;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-
-import org.apache.ibatis.builder.BaseBuilder;
-import org.apache.ibatis.builder.BuilderException;
-import org.apache.ibatis.builder.CacheRefResolver;
-import org.apache.ibatis.builder.IncompleteElementException;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
-import org.apache.ibatis.builder.ResultMapResolver;
+import org.apache.ibatis.builder.*;
 import org.apache.ibatis.cache.Cache;
 import org.apache.ibatis.executor.ErrorContext;
 import org.apache.ibatis.io.Resources;
-import org.apache.ibatis.mapping.Discriminator;
-import org.apache.ibatis.mapping.ParameterMapping;
-import org.apache.ibatis.mapping.ParameterMode;
-import org.apache.ibatis.mapping.ResultFlag;
-import org.apache.ibatis.mapping.ResultMap;
-import org.apache.ibatis.mapping.ResultMapping;
+import org.apache.ibatis.mapping.*;
 import org.apache.ibatis.parsing.XNode;
 import org.apache.ibatis.parsing.XPathParser;
 import org.apache.ibatis.reflection.MetaClass;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.TypeHandler;
+
+import java.io.InputStream;
+import java.io.Reader;
+import java.util.*;
 
 /**
  * @author Clinton Begin
@@ -91,8 +74,11 @@ public class XMLMapperBuilder extends BaseBuilder {
 
   public void parse() {
     if (!configuration.isResourceLoaded(resource)) {
+      // 1.解析所有的子标签，最终获得MapperStatement对象，该对象最后放到Configuration对象中
       configurationElement(parser.evalNode("/mapper"));
       configuration.addLoadedResource(resource);
+      // 2.1 把namespace(接口类型)和工厂类MapperProxyFactory绑定起来
+      // 2.2 解析接口及其方法上的注解，最终也会获得MapperStatement独享
       bindMapperForNamespace();
     }
 
@@ -105,6 +91,10 @@ public class XMLMapperBuilder extends BaseBuilder {
     return sqlFragments.get(refid);
   }
 
+  /**
+   * 对Mapper.xml中所有具体标签的解析，包括namespace、cache、parameterMap、resultMap、sql和select|insert|update|delete
+   * @param context
+   */
   private void configurationElement(XNode context) {
     try {
       String namespace = context.getStringAttribute("namespace");
@@ -112,11 +102,17 @@ public class XMLMapperBuilder extends BaseBuilder {
         throw new BuilderException("Mapper's namespace cannot be empty");
       }
       builderAssistant.setCurrentNamespace(namespace);
+      // 添加缓存对象
       cacheRefElement(context.evalNode("cache-ref"));
+      // 解析cache属性，添加缓存对象
       cacheElement(context.evalNode("cache"));
+      // 创建ParameterMapping对象
       parameterMapElement(context.evalNodes("/mapper/parameterMap"));
+      // 创建List<ResultMapping>
       resultMapElements(context.evalNodes("/mapper/resultMap"));
+      // 解析可以复用的sql
       sqlElement(context.evalNodes("/mapper/sql"));
+      //Mapper next 解析增删改查标签，获得MapperStatement
       buildStatementFromContext(context.evalNodes("select|insert|update|delete"));
     } catch (Exception e) {
       throw new BuilderException("Error parsing Mapper XML. The XML location is '" + resource + "'. Cause: " + e, e);
@@ -130,10 +126,18 @@ public class XMLMapperBuilder extends BaseBuilder {
     buildStatementFromContext(list, null);
   }
 
+
+  /**
+   * 创建了XMLStatementBuilder用于解析增删改查标签
+   * 并把MappedStatement添加到mappedStatements中#statementParser.parseStatementNode();
+   * @param list
+   * @param requiredDatabaseId
+   */
   private void buildStatementFromContext(List<XNode> list, String requiredDatabaseId) {
     for (XNode context : list) {
       final XMLStatementBuilder statementParser = new XMLStatementBuilder(configuration, builderAssistant, context, requiredDatabaseId);
       try {
+        // next
         statementParser.parseStatementNode();
       } catch (IncompleteElementException e) {
         configuration.addIncompleteStatement(statementParser);
@@ -198,6 +202,18 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+  /**
+   * 问题1：二级缓存为什么要用TCM来管理？
+   *  1、首先插入— 条数据（没有提交），此时二级缓存会被清空。
+   *  2、在这个事务中查询数据，写入二级缓存。
+   *  3、提交事务，出现异常，数据回滚。
+   *  此时出现了数据库没有这条数据，但是二级缓存有这条数据的情况。所以MyBatis的二级缓存需要跟事务关联起来。
+   * 问题2：为什么一级缓存不需要？
+   *  因为— 个session 就是— 个事务，事务回滚，会话就结束了，缓存也清空了，不存在读到— 级缓存中脏数据的情况。
+   *  二级缓存是跨session 的，也就是跨事务的，才有可能出现对同一个方法的不同事务访问。
+   *
+   * @param context
+   */
   private void cacheElement(XNode context) {
     if (context != null) {
       String type = context.getStringAttribute("type", "PERPETUAL");
@@ -209,6 +225,7 @@ public class XMLMapperBuilder extends BaseBuilder {
       boolean readWrite = !context.getBooleanAttribute("readOnly", false);
       boolean blocking = context.getBooleanAttribute("blocking", false);
       Properties props = context.getChildrenAsProperties();
+      // 此处创建了— 个Cache，这里是一个二级缓存对象。
       builderAssistant.useNewCache(typeClass, evictionClass, flushInterval, size, readWrite, blocking, props);
     }
   }
@@ -433,6 +450,7 @@ public class XMLMapperBuilder extends BaseBuilder {
           // to prevent loading again this resource from the mapper interface
           // look at MapperAnnotationBuilder#loadXmlResource
           configuration.addLoadedResource("namespace:" + namespace);
+          // 关键方法
           configuration.addMapper(boundType);
         }
       }
